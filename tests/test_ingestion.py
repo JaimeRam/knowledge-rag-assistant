@@ -26,9 +26,7 @@ async def test_embedder():
     embedding = await embedder.embed_text("Agumon is a Rookie Digimon")
     
     assert isinstance(embedding, list)
-    assert len(embedding) == 1536  # OpenAI text-embedding-3-small dimension
-    
-    await embedder.close()
+    assert len(embedding) == 1024  # Voyage AI voyage-3 dimension
 
 
 @pytest.mark.asyncio

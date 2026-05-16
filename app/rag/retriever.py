@@ -16,7 +16,7 @@ class Retriever:
     async def retrieve(self, query: str, limit: int = 5, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
         """Retrieve relevant chunks for a query."""
         # Generate embedding for query
-        query_vector = await self.embedder.embed_text(query)
+        query_vector = await self.embedder.embed_text(query, input_type="query")
         
         if not query_vector:
             logger.error("Failed to generate query embedding")
@@ -35,4 +35,4 @@ class Retriever:
     
     async def close(self):
         """Close resources."""
-        await self.embedder.close()
+        pass

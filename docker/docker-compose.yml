@@ -36,7 +36,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=postgresql://digimon:digimon_pass@postgres:5432/digimon_db
+      - DATABASE_URL=postgresql://digimon:digimon_pass@postgres:5432/langfuse_db
       - NEXTAUTH_SECRET=change_this_secret_in_production
       - NEXTAUTH_URL=http://localhost:3000
       - SALT=change_this_salt_in_production

@@ -44,3 +44,11 @@ Thumbs.db
 # Database
 *.db
 *.sqlite
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Type checking
+.mypy_cache/

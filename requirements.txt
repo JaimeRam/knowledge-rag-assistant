@@ -13,18 +13,19 @@ alembic>=1.14.0
 redis>=5.2.0
 
 # LLM & Embeddings
-openai>=1.54.0
 anthropic>=0.40.0
-sentence-transformers>=3.3.0
+voyageai>=0.3.0
 
 # MCP
 mcp>=1.27.0
 
-# Agents
-openai-agents>=0.0.6
+# AI Agents
+pydantic-ai>=1.97.0
+langgraph>=0.2.0
+langchain-anthropic>=0.3.0
 
-# Observability
-langfuse>=2.53.0
+# Observability — pinned to v2.x to match server image langfuse/langfuse:2.53.0
+langfuse>=2.53.0,<3.0.0
 
 # HTTP & Async
 httpx>=0.27.0

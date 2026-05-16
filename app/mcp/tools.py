@@ -73,7 +73,7 @@ class MCPTools:
             return []
         
         skills = digimon.get("skills", [])
-        return [s.get("name", "") for s in skills if s.get("name")]
+        return [s.get("skill", "") for s in skills if s.get("skill")]
     
     async def close(self):
         """Close resources."""

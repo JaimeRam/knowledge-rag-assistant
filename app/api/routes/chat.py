@@ -6,6 +6,8 @@ from app.rag.prompt_builder import PromptBuilder
 from app.rag.llm_client import LLMClient
 from app.db.redis import RedisManager
 from app.observability.langfuse import LangfuseManager
+import hashlib
+import json
 import time
 import logging
 
@@ -38,8 +40,11 @@ async def chat(request: ChatRequest):
     langfuse = LangfuseManager()
     
     try:
-        # Check cache first
-        cache_key = f"chat:{request.query}"
+        # Check cache first — include filters in the key to avoid collisions
+        filters_hash = hashlib.md5(
+            json.dumps({"level": request.level_filter, "type": request.type_filter}, sort_keys=True).encode()
+        ).hexdigest()[:8]
+        cache_key = f"chat:{request.query}:{filters_hash}"
         cached_response = await redis.get(cache_key)
         
         if cached_response:
