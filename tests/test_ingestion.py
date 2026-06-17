@@ -2,6 +2,8 @@ import pytest
 from app.ingestion.dapi_client import DAPIClient
 from app.ingestion.embedder import Embedder
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.mark.asyncio
 async def test_dapi_client_fetch_list():

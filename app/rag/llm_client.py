@@ -35,7 +35,7 @@ class LLMClient:
             }
         except Exception as e:
             logger.error(f"Error in LLM chat: {e}")
-            return {"content": "Sorry, I encountered an error processing your request.", "usage": {}}
+            raise
 
     async def close(self):
-        pass
+        await self.client.close()

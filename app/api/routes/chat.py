@@ -1,11 +1,12 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from app.rag.retriever import Retriever
 from app.rag.prompt_builder import PromptBuilder
 from app.rag.llm_client import LLMClient
 from app.db.redis import RedisManager
 from app.observability.langfuse import LangfuseManager
+from app.guardrails.input_guard import InputGuard, OFF_TOPIC_MESSAGE
 import hashlib
 import json
 import time
@@ -17,7 +18,7 @@ router = APIRouter(prefix="/api/v1", tags=["chat"])
 
 
 class ChatRequest(BaseModel):
-    query: str
+    query: str = Field(..., min_length=1, max_length=2000)
     level_filter: Optional[str] = None
     type_filter: Optional[str] = None
 
@@ -40,11 +41,17 @@ async def chat(request: ChatRequest):
     langfuse = LangfuseManager()
     
     try:
+        # Guardrail: block off-topic queries before any expensive operations
+        guard = InputGuard(llm_client)
+        if not await guard.is_digimon_related(request.query):
+            raise HTTPException(status_code=400, detail=OFF_TOPIC_MESSAGE)
+
         # Check cache first — include filters in the key to avoid collisions
+        query_hash = hashlib.sha256(request.query.encode()).hexdigest()[:16]
         filters_hash = hashlib.md5(
             json.dumps({"level": request.level_filter, "type": request.type_filter}, sort_keys=True).encode()
         ).hexdigest()[:8]
-        cache_key = f"chat:{request.query}:{filters_hash}"
+        cache_key = f"chat:{query_hash}:{filters_hash}"
         cached_response = await redis.get(cache_key)
         
         if cached_response:
@@ -67,7 +74,7 @@ async def chat(request: ChatRequest):
         
         # Trace retrieval
         avg_score = sum(c.get("score", 0) for c in context_chunks) / len(context_chunks) if context_chunks else 0
-        await langfuse.trace_retrieval(
+        langfuse.trace_retrieval(
             query=request.query,
             retrieved_count=len(context_chunks),
             avg_score=avg_score,
@@ -102,27 +109,27 @@ async def chat(request: ChatRequest):
         )
         
         # Trace chat interaction
-        await langfuse.trace_chat(
+        langfuse.trace_chat(
             query=request.query,
             response=llm_response["content"],
             context_chunks=context_chunks,
             token_usage=llm_response["usage"],
             latency_ms=latency_ms
         )
-        
+
         # Cache the response
-        await redis.set(cache_key, response.dict(), ttl=86400)
-        
-        # Flush traces
-        langfuse.flush()
-        
+        await redis.set(cache_key, response.model_dump(), ttl=86400)
+
         return response
-    
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in chat endpoint: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
-    
+
     finally:
         await retriever.close()
         await llm_client.close()
+        await redis.close()
         langfuse.flush()

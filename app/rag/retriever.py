@@ -1,6 +1,6 @@
 from app.db.qdrant import QdrantManager
 from app.ingestion.embedder import Embedder
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ class Retriever:
         self.qdrant = QdrantManager()
         self.embedder = Embedder()
     
-    async def retrieve(self, query: str, limit: int = 5, filters: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+    async def retrieve(self, query: str, limit: int = 5, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Retrieve relevant chunks for a query."""
         # Generate embedding for query
         query_vector = await self.embedder.embed_text(query, input_type="query")

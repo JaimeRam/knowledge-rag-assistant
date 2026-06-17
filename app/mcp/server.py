@@ -28,13 +28,13 @@ class MCPServer:
             
             elif tool_name == "get_digimon_by_id":
                 digimon_id = kwargs.get("digimon_id")
-                if not digimon_id:
+                if digimon_id is None:
                     return {"error": "Missing required parameter: digimon_id"}
                 return await self.tools.get_digimon_by_id(digimon_id)
-            
+
             elif tool_name == "get_digimon_skills":
                 digimon_id = kwargs.get("digimon_id")
-                if not digimon_id:
+                if digimon_id is None:
                     return {"error": "Missing required parameter: digimon_id"}
                 return {"skills": await self.tools.get_digimon_skills(digimon_id)}
             

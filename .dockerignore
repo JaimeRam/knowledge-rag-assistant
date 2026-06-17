@@ -1,0 +1,15 @@
+.env
+venv/
+.git/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+tests/
+scripts/
+docker/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+scripts/.eval_cache.json

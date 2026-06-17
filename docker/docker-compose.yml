@@ -2,9 +2,9 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.17.0
     container_name: digimon-qdrant
+    restart: unless-stopped
     ports:
       - "6333:6333"
-      - "6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
     environment:
@@ -13,6 +13,7 @@ services:
   redis:
     image: redis:7.4-alpine
     container_name: digimon-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
@@ -21,27 +22,36 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: digimon-postgres
+    restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
       - POSTGRES_DB=digimon_db
       - POSTGRES_USER=digimon
-      - POSTGRES_PASSWORD=digimon_pass
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-digimon_pass}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init-langfuse-db.sql:/docker-entrypoint-initdb.d/init-langfuse-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U digimon -d digimon_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   langfuse:
     image: langfuse/langfuse:2.53.0
     container_name: digimon-langfuse
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=postgresql://digimon:digimon_pass@postgres:5432/langfuse_db
-      - NEXTAUTH_SECRET=change_this_secret_in_production
+      - DATABASE_URL=postgresql://digimon:${POSTGRES_PASSWORD:-digimon_pass}@postgres:5432/langfuse_db
+      - NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET:-change_this_secret_in_production}
       - NEXTAUTH_URL=http://localhost:3000
-      - SALT=change_this_salt_in_production
+      - SALT=${LANGFUSE_SALT:-change_this_salt_in_production}
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
 volumes:
   qdrant_data:

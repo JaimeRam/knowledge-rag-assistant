@@ -22,6 +22,8 @@ A production-ready RAG-powered knowledge assistant demonstrating modern LLM back
 | Agent Protocol | MCP (Model Context Protocol) |
 | Typed Agent | PydanticAI (tool-calling agent) |
 | Agentic RAG | LangGraph (Corrective RAG workflow) |
+| Guardrails | Custom `InputGuard` (LLM-based, fail-open) |
+| RAG Evaluation | RAGAS (faithfulness, relevancy, precision, recall) |
 | Infrastructure | Docker + docker-compose |
 
 ## Architecture
@@ -33,10 +35,10 @@ A production-ready RAG-powered knowledge assistant demonstrating modern LLM back
                             │
              ┌──────────────┴─────────────┐
              │                            │
-  ┌──────────▼──────────────┐  ┌──────────▼──────────────────────┐
-  │   POST /api/v1/chat     │  │   POST /api/v1/agent            │
-  │      (Custom RAG)       │  │   POST /api/v1/agent/graph      │
-  └──────────┬──────────────┘  └──────────┬──────────────────────┘
+  ┌──────────▼──────────────┐  ┌──────────▼───────────────────┐
+  │   POST /api/v1/chat     │  │   POST /api/v1/agent         │
+  │      (Custom RAG)       │  │   POST /api/v1/agent/graph   │
+  └──────────┬──────────────┘  └──────────┬───────────────────┘
              │                            │
              └──────────────┬─────────────┘
                             │
@@ -89,7 +91,7 @@ cd knowledge-rag-assistant
 2. Create and activate a virtual environment:
 
 ```bash
-python3 -m venv venv
+python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
@@ -232,6 +234,7 @@ knowledge-rag-assistant/
 │   ├── core/             # Config (pydantic-settings) and logging
 │   ├── ingestion/        # DAPI client, embedder, ingest pipeline
 │   ├── rag/              # Retriever, prompt builder, LLM client
+│   ├── guardrails/       # InputGuard — LLM-based topic classifier (fail-open)
 │   ├── mcp/              # MCP server with 4 Digimon tools
 │   ├── agents/
 │   │   ├── pydantic_agent.py # PydanticAI agent with 4 typed tools
@@ -268,6 +271,10 @@ This project demonstrates key skills for LLM Backend Developer roles:
 
 7. **Cost Optimization**: Redis caching avoids redundant LLM calls for identical queries, with proper cache-key design to prevent collisions across different filter combinations.
 
+8. **Input Guardrails**: LLM-based classifier blocks off-topic queries before they reach the RAG pipeline. Fail-open design ensures a guardrail outage never takes down the main service.
+
+9. **RAGAS Evaluation**: Industry-standard RAG evaluation with 4 metrics (faithfulness, answer relevancy, context precision, context recall) against a 10-question golden dataset — measures actual pipeline quality, not just test pass/fail.
+
 ## Roadmap
 
 - [x] Custom RAG pipeline (Retriever → PromptBuilder → LLMClient)
@@ -278,10 +285,64 @@ This project demonstrates key skills for LLM Backend Developer roles:
 - [x] Docker infrastructure
 - [x] PydanticAI typed agent with automatic tool selection
 - [x] LangGraph Corrective RAG with query rewriting
-- [ ] Comprehensive test suite with pytest
-- [ ] RAG evaluation pipeline (precision, recall, faithfulness)
-- [ ] Guardrails for output validation
+- [x] Comprehensive test suite with pytest (mocked, no external services required)
+- [x] RAG evaluation pipeline with RAGAS (faithfulness, relevancy, precision, recall)
+- [x] Input guardrails to block off-topic queries (fail-open design)
 - [ ] Rate limiting and authentication
+
+## Running Tests
+
+Tests are fully mocked — no external services required:
+
+```bash
+# Activate venv
+source venv/bin/activate
+
+# Run all unit tests (test_ingestion.py excluded by default — needs live services)
+make test
+# or: pytest tests/ -v --ignore=tests/test_ingestion.py
+
+# With coverage report
+pytest tests/ -v --ignore=tests/test_ingestion.py --cov=app --cov-report=term-missing
+
+# Integration tests (requires make services + valid API keys)
+pytest -m integration
+```
+
+Test suite covers: `PromptBuilder`, `LLMClient`, `Retriever`, `/chat` endpoint (including cache hit), and `InputGuard` guardrails.
+
+`tests/test_ingestion.py` is marked `@pytest.mark.integration` and excluded from the default run.
+
+## RAG Evaluation
+
+Evaluates the pipeline against a 10-question golden dataset using [RAGAS](https://docs.ragas.io/) metrics:
+
+| Metric | Measures |
+|---|---|
+| `faithfulness` | Is the answer grounded in the retrieved context? |
+| `answer_relevancy` | Is the answer relevant to the question? |
+| `context_precision` | Are the retrieved chunks precise (not noisy)? |
+| `context_recall` | Do the chunks cover the ground-truth answer? |
+
+```bash
+# Requires: make services + make ingest (Qdrant must have data)
+source venv/bin/activate
+python scripts/evaluate_rag.py            # build dataset + evaluate (~60 min total)
+python scripts/evaluate_rag.py --eval-only  # reuse cached dataset, skip rebuild (~55 min)
+```
+
+Output: per-question scores table + overall averages. Faithfulness < 0.7 indicates a prompt issue; context recall < 0.6 indicates an ingestion or embedding issue.
+
+**Baseline scores on default 100-Digimon ingest:**
+
+| Metric | Score | Threshold |
+|---|---|---|
+| `faithfulness` | 0.991 | ≥ 0.70 ✓ |
+| `context_precision` | 0.900 | ≥ 0.70 ✓ |
+| `context_recall` | 1.000 | ≥ 0.60 ✓ |
+| `answer_relevancy` | 0.558 | ≥ 0.70 ⚠ |
+
+> `answer_relevancy` below threshold is a known trade-off: the assistant returns complete Digimon profiles even for narrow questions, which RAGAS penalises by comparing inferred questions against the original. Faithfulness and recall are the critical production metrics.
 
 ## Contributing
 

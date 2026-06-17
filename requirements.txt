@@ -20,8 +20,8 @@ voyageai>=0.3.0
 mcp>=1.27.0
 
 # AI Agents
-pydantic-ai>=1.97.0
-langgraph>=0.2.0
+pydantic-ai-slim[anthropic]>=1.97.0,<2.0.0
+langgraph>=1.0.0
 langchain-anthropic>=0.3.0
 
 # Observability — pinned to v2.x to match server image langfuse/langfuse:2.53.0
@@ -35,6 +35,10 @@ aiohttp>=3.10.0
 pytest>=8.3.0
 pytest-asyncio>=0.24.0
 pytest-cov>=5.0.0
+
+# RAG Evaluation (ragas pulls in openai + langchain_openai as transitive deps)
+ragas==0.4.3
+langchain-voyageai>=0.1.0
 
 # Utilities
 tenacity>=9.0.0

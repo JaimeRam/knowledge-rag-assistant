@@ -25,7 +25,7 @@ class LangfuseManager:
             self.enabled = False
             logger.warning("Langfuse observability disabled (missing credentials)")
 
-    async def trace_chat(
+    def trace_chat(
         self,
         query: str,
         response: str,
@@ -62,7 +62,7 @@ class LangfuseManager:
         except Exception as e:
             logger.error(f"Error tracing chat interaction: {e}")
 
-    async def trace_tool_call(
+    def trace_tool_call(
         self,
         tool_name: str,
         parameters: Dict[str, Any],
@@ -83,7 +83,7 @@ class LangfuseManager:
         except Exception as e:
             logger.error(f"Error tracing tool call: {e}")
 
-    async def trace_retrieval(
+    def trace_retrieval(
         self,
         query: str,
         retrieved_count: int,

@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+from sqlalchemy.exc import SQLAlchemyError
 from app.db.postgres import PostgresManager, DigimonMetadata
-from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["digimon"])
 
@@ -11,15 +13,15 @@ async def get_digimon(digimon_id: int):
     """Get Digimon metadata by ID."""
     postgres = PostgresManager()
     session = postgres.get_session()
-    
+
     try:
         digimon = session.query(DigimonMetadata).filter(
             DigimonMetadata.dapi_id == digimon_id
         ).first()
-        
+
         if not digimon:
             raise HTTPException(status_code=404, detail="Digimon not found")
-        
+
         return {
             "id": digimon.dapi_id,
             "name": digimon.name,
@@ -27,33 +29,46 @@ async def get_digimon(digimon_id: int):
             "type": digimon.type,
             "attribute": digimon.attribute,
             "description": digimon.description,
-            "image_url": digimon.image_url
+            "image_url": digimon.image_url,
         }
-    
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        logger.error(f"Database error fetching digimon {digimon_id}: {e}")
+        raise HTTPException(status_code=503, detail="Database unavailable")
+
     finally:
         session.close()
         postgres.close()
 
 
 @router.get("/digimon")
-async def list_digimons(limit: int = 10, offset: int = 0):
+async def list_digimons(
+    limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+):
     """List Digimons with pagination."""
     postgres = PostgresManager()
     session = postgres.get_session()
-    
+
     try:
         digimons = session.query(DigimonMetadata).offset(offset).limit(limit).all()
-        
+
         return [
             {
                 "id": d.dapi_id,
                 "name": d.name,
                 "level": d.level,
-                "type": d.type
+                "type": d.type,
             }
             for d in digimons
         ]
-    
+
+    except SQLAlchemyError as e:
+        logger.error(f"Database error listing digimons: {e}")
+        raise HTTPException(status_code=503, detail="Database unavailable")
+
     finally:
         session.close()
         postgres.close()

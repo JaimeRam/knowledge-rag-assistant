@@ -1,7 +1,6 @@
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
-from datetime import datetime
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from datetime import datetime, timezone
 from typing import Optional
 from app.core.config import get_settings
 import logging
@@ -23,8 +22,8 @@ class DigimonMetadata(Base):
     attribute = Column(String(100))
     description = Column(Text)
     image_url = Column(String(500))
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class ConversationLog(Base):
@@ -37,7 +36,7 @@ class ConversationLog(Base):
     digimon_ids = Column(Text)  # JSON array of digimon IDs referenced
     latency_ms = Column(Integer)
     token_count = Column(Integer)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class PostgresManager:

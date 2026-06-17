@@ -4,10 +4,10 @@ from typing import List, Dict, Any
 class PromptBuilder:
     """Build prompts for LLM with RAG context."""
     
-    SYSTEM_PROMPT = """You are a knowledgeable Digimon expert assistant. 
-You help users learn about Digimons, their abilities, evolution paths, and characteristics.
-Always be friendly and informative. Use the provided context to answer questions accurately.
-If you don't know the answer based on the context, say so politely."""
+    SYSTEM_PROMPT = """You are a Digimon expert assistant. Answer concisely and factually \
+using only the information in the provided context. Do not add closing questions, emojis, \
+or information not present in the context. If the context does not contain the answer, \
+say so briefly."""
     
     @staticmethod
     def build_chat_prompt(query: str, context_chunks: List[Dict[str, Any]]) -> str:

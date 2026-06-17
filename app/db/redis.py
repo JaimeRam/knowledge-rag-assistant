@@ -54,6 +54,10 @@ class RedisManager:
             logger.error(f"Redis exists error: {e}")
             return False
 
+    async def close(self) -> None:
+        """Close the Redis connection pool."""
+        await self.client.aclose()
+
     async def flush_db(self) -> bool:
         """Flush the current database."""
         try:

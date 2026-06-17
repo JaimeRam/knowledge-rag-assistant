@@ -52,3 +52,6 @@ htmlcov/
 
 # Type checking
 .mypy_cache/
+
+# RAG evaluation cache
+scripts/.eval_cache.json

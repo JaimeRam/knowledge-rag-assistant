@@ -132,8 +132,7 @@ class DataIngestor:
         # Phase 3: Embed all chunks in rate-limited batches
         all_embeddings = await self._embed_all(all_texts)
 
-        # Phase 4: Build Qdrant points + PostgreSQL upsert records
-        session = self.postgres.get_session()
+        # Phase 4: Build Qdrant points + PostgreSQL records (no I/O here)
         points: List[PointStruct] = []
         pg_records: List[Dict[str, Any]] = []
         seen_ids: set = set()
@@ -178,23 +177,25 @@ class DataIngestor:
         for i in range(0, len(points), 100):
             await self.qdrant.upsert_points(points[i : i + 100])
 
-        if pg_records:
-            stmt = pg_insert(DigimonMetadata).values(pg_records)
-            stmt = stmt.on_conflict_do_update(
-                index_elements=["dapi_id"],
-                set_={
-                    "name": stmt.excluded.name,
-                    "level": stmt.excluded.level,
-                    "type": stmt.excluded.type,
-                    "attribute": stmt.excluded.attribute,
-                    "description": stmt.excluded.description,
-                    "image_url": stmt.excluded.image_url,
-                },
-            )
-            session.execute(stmt)
-
-        session.commit()
-        session.close()
+        session = self.postgres.get_session()
+        try:
+            if pg_records:
+                stmt = pg_insert(DigimonMetadata).values(pg_records)
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=["dapi_id"],
+                    set_={
+                        "name": stmt.excluded.name,
+                        "level": stmt.excluded.level,
+                        "type": stmt.excluded.type,
+                        "attribute": stmt.excluded.attribute,
+                        "description": stmt.excluded.description,
+                        "image_url": stmt.excluded.image_url,
+                    },
+                )
+                session.execute(stmt)
+            session.commit()
+        finally:
+            session.close()
 
         await self.dapi_client.close()
         logger.info(
