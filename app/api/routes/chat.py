@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 from app.rag.retriever import Retriever
@@ -6,6 +6,7 @@ from app.rag.prompt_builder import PromptBuilder
 from app.rag.llm_client import LLMClient
 from app.db.redis import RedisManager
 from app.observability.langfuse import LangfuseManager
+from app.observability.llm_judge import LLMJudge
 from app.guardrails.input_guard import InputGuard, OFF_TOPIC_MESSAGE
 import hashlib
 import json
@@ -30,8 +31,27 @@ class ChatResponse(BaseModel):
     latency_ms: int
 
 
+async def _judge_response(trace_id: str, query: str, context_texts: list, answer: str) -> None:
+    """Background task: LLM-as-judge scores sent to Langfuse after the response is returned."""
+    judge = LLMJudge()
+    langfuse = LangfuseManager()
+    try:
+        logger.info(f"[judge] evaluating trace {trace_id[:8]}…")
+        scores = await judge.evaluate(query, context_texts, answer)
+        if scores:
+            for name, value in scores.items():
+                langfuse.add_score(trace_id, name, value, comment="llm-judge")
+            logger.info(f"[judge] scores added to trace {trace_id[:8]}: {scores}")
+        else:
+            logger.warning(f"[judge] evaluate() returned empty dict for trace {trace_id[:8]}")
+    except Exception as e:
+        logger.error(f"[judge] background task failed: {e}")
+    finally:
+        langfuse.flush()
+
+
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
     """Chat endpoint with RAG."""
     start_time = time.time()
     
@@ -108,14 +128,24 @@ async def chat(request: ChatRequest):
             latency_ms=latency_ms
         )
         
-        # Trace chat interaction
-        langfuse.trace_chat(
+        # Trace chat interaction and schedule LLM-as-judge in background
+        trace_id = langfuse.trace_chat(
             query=request.query,
             response=llm_response["content"],
             context_chunks=context_chunks,
             token_usage=llm_response["usage"],
-            latency_ms=latency_ms
+            latency_ms=latency_ms,
         )
+        if trace_id:
+            context_texts = [
+                c.get("payload", {}).get("chunk_text", "")
+                for c in context_chunks
+                if c.get("payload", {}).get("chunk_text")
+            ]
+            if context_texts:
+                background_tasks.add_task(
+                    _judge_response, trace_id, request.query, context_texts, llm_response["content"]
+                )
 
         # Cache the response
         await redis.set(cache_key, response.model_dump(), ttl=86400)

@@ -33,10 +33,10 @@ class LangfuseManager:
         token_usage: Dict[str, int],
         latency_ms: int,
         metadata: Optional[Dict[str, Any]] = None,
-    ):
-        """Trace a full chat interaction with its LLM generation."""
+    ) -> Optional[str]:
+        """Trace a full chat interaction. Returns the trace ID (or None if disabled)."""
         if not self.enabled:
-            return
+            return None
         try:
             trace = self.client.trace(
                 name="chat_interaction",
@@ -58,9 +58,31 @@ class LangfuseManager:
                     "total": token_usage.get("total_tokens", 0),
                 },
             )
+
+            # System metric scores (visible in Langfuse dashboard per trace)
+            self.client.score(trace_id=trace.id, name="latency_ms", value=float(latency_ms))
+            total_tokens = token_usage.get("total_tokens", 0)
+            if total_tokens:
+                self.client.score(
+                    trace_id=trace.id, name="total_tokens", value=float(total_tokens)
+                )
+            if context_chunks:
+                self.client.score(
+                    trace_id=trace.id,
+                    name="context_count",
+                    value=float(len(context_chunks)),
+                )
+                avg = sum(c.get("score", 0) for c in context_chunks) / len(context_chunks)
+                if avg > 0:
+                    self.client.score(
+                        trace_id=trace.id, name="retrieval_avg_score", value=avg
+                    )
+
             logger.info(f"Traced chat interaction: {query[:50]}...")
+            return trace.id
         except Exception as e:
             logger.error(f"Error tracing chat interaction: {e}")
+            return None
 
     def trace_tool_call(
         self,
@@ -94,15 +116,35 @@ class LangfuseManager:
         if not self.enabled:
             return
         try:
-            self.client.trace(
+            trace = self.client.trace(
                 name="retrieval",
                 input={"query": query},
                 output={"retrieved_count": retrieved_count, "avg_score": avg_score},
                 metadata={"latency_ms": latency_ms},
             )
+            self.client.score(
+                trace_id=trace.id, name="retrieved_count", value=float(retrieved_count)
+            )
+            if avg_score > 0:
+                self.client.score(trace_id=trace.id, name="avg_score", value=avg_score)
             logger.info(f"Traced retrieval: {retrieved_count} chunks, avg_score={avg_score:.3f}")
         except Exception as e:
             logger.error(f"Error tracing retrieval: {e}")
+
+    def add_score(
+        self,
+        trace_id: str,
+        name: str,
+        value: float,
+        comment: Optional[str] = None,
+    ):
+        """Add a numeric score to an existing trace (e.g. LLM-as-judge results)."""
+        if not self.enabled or not trace_id:
+            return
+        try:
+            self.client.score(trace_id=trace_id, name=name, value=value, comment=comment)
+        except Exception as e:
+            logger.error(f"Error adding score '{name}' to trace {trace_id}: {e}")
 
     def flush(self):
         """Flush buffered traces to the Langfuse server."""

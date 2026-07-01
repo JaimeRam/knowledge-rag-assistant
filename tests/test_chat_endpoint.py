@@ -12,6 +12,7 @@ def app_client():
         patch("app.api.routes.chat.RedisManager") as mock_redis_cls,
         patch("app.api.routes.chat.LangfuseManager") as mock_langfuse_cls,
         patch("app.api.routes.chat.InputGuard") as mock_guard_cls,
+        patch("app.api.routes.chat.LLMJudge") as mock_judge_cls,
     ):
         # Retriever mock
         retriever_instance = MagicMock()
@@ -51,12 +52,20 @@ def app_client():
         redis_instance.close = AsyncMock()
         mock_redis_cls.return_value = redis_instance
 
-        # Langfuse mock — trace methods are sync (no await)
+        # Langfuse mock — trace methods are sync (no await); trace_chat returns a trace ID
         langfuse_instance = MagicMock()
         langfuse_instance.trace_retrieval = MagicMock()
-        langfuse_instance.trace_chat = MagicMock()
+        langfuse_instance.trace_chat = MagicMock(return_value="mock-trace-id")
+        langfuse_instance.add_score = MagicMock()
         langfuse_instance.flush = MagicMock()
         mock_langfuse_cls.return_value = langfuse_instance
+
+        # LLMJudge mock — evaluate returns faithfulness + relevance scores
+        judge_instance = MagicMock()
+        judge_instance.evaluate = AsyncMock(
+            return_value={"faithfulness": 0.9, "relevance": 0.85, "context_relevance": 0.88}
+        )
+        mock_judge_cls.return_value = judge_instance
 
         from app.api.main import app
         with TestClient(app) as client:

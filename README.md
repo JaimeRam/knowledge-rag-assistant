@@ -1,5 +1,6 @@
 # Knowledge RAG Assistant
 
+![CI](https://github.com/JaimeRam/knowledge-rag-assistant/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
@@ -66,7 +67,7 @@ A production-ready RAG-powered knowledge assistant demonstrating modern LLM back
 - **PydanticAI Agent** (`/api/v1/agent`): type-safe agent with 4 tools (RAG search, by name, by level, skills) and automatic tool selection
 - **LangGraph Corrective RAG** (`/api/v1/agent/graph`): agentic retrieve → grade → generate workflow with query rewriting when docs aren't relevant
 - **MCP Server**: 4 tools exposing Digimon data (by name, level, ID, skills)
-- **Observability**: Full tracing with Langfuse (LLM calls, retrievals, tool invocations)
+- **Observability**: Full tracing with Langfuse — per-trace numeric scores (latency, tokens, retrieval quality) and async LLM-as-judge evaluation (faithfulness, relevance, context relevance)
 - **Semantic Caching**: Redis-based response caching to reduce API costs
 - **Data Ingestion**: Async pipeline from [DAPI](https://digi-api.com/) → Voyage AI embeddings → Qdrant + PostgreSQL
 
@@ -267,7 +268,7 @@ This project demonstrates key skills for LLM Backend Developer roles:
 
 5. **MCP (Model Context Protocol)**: Implements the emerging standard for tool integration between LLMs and external systems.
 
-6. **Production Observability**: Full tracing with Langfuse covering LLM calls, retrieval steps, and tool invocations — critical for debugging and cost monitoring.
+6. **Production Observability**: Full tracing with Langfuse — numeric scores per trace (latency, tokens, retrieval quality) plus async LLM-as-judge evaluation (faithfulness, relevance, context relevance) as a background task so it never adds latency to the API response.
 
 7. **Cost Optimization**: Redis caching avoids redundant LLM calls for identical queries, with proper cache-key design to prevent collisions across different filter combinations.
 
@@ -288,6 +289,7 @@ This project demonstrates key skills for LLM Backend Developer roles:
 - [x] Comprehensive test suite with pytest (mocked, no external services required)
 - [x] RAG evaluation pipeline with RAGAS (faithfulness, relevancy, precision, recall)
 - [x] Input guardrails to block off-topic queries (fail-open design)
+- [x] LLM-as-judge scoring in Langfuse (faithfulness, relevance, context relevance — async background task)
 - [ ] Rate limiting and authentication
 
 ## Running Tests
